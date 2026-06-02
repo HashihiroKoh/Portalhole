@@ -14,7 +14,7 @@ function stopCamera(){
   onFlag=false;
 }
 var moving = function () {
-  const camera = document.querySelector("#camera");
+  const camera = document.querySelector("a-camera");
       let camerapos = camera.getAttribute("position");
       let camerarot = camera.getAttribute("rotation");
     
