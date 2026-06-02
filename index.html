@@ -1,10 +1,8 @@
-<html>
-  <head>
+<!DOCTYPE html>
+<html lang="ja">
     <meta charset="utf-8" />
     <title>Portal Hole</title>
-    <meta name="viewport" />
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>    
     <script src="script.js"></script>
     <script>
       const holePosX = 0;
@@ -15,11 +13,14 @@
 
       var portalFlag = false;
       var lastPosz = 0;
+      var lastFlag;
       AFRAME.registerComponent("open", {
         init: function () {
           this.el.addEventListener("click", function (e) {
             const mes = document.getElementById("mes");
             mes.setAttribute("visible", "false");
+            const hole = document.getElementById("hole");
+            hole.setAttribute("visible", "true");
             const door = document.getElementById("door");
             door.setAttribute("animation", {
               property: "radius-inner",
@@ -31,17 +32,8 @@
             });
             setTimeout(() => {
               door.setAttribute("visible", "false");
-              const point = document.getElementById("point");
-              point.setAttribute("cursor", "rayOrigin: mouse");
-              point.setAttribute("position", "0 0.01 -0.05");
-              point.setAttribute("geometry", { primitive: "ring" });
-              point.setAttribute("scale", "0.001 0.001 0.001");
-              point.setAttribute("material", {
-                color: "white",
-                shader: "flat",
-              });
               let btgo = document.getElementById("btgo");
-              btgo.setAttribute("visible", "true;");
+              btgo.setAttribute("visible", "true");
             }, 3000);
           });
         },
@@ -55,152 +47,135 @@
       AFRAME.registerComponent("portalcheck", {
         init: function () {
           this.camera = this.el;
-          const omote = document.getElementById("omote");
-          const ura = document.getElementById("ura");
-          const sky = document.getElementById("sky");
+          lastPosz = this.camera.object3D.position.z;  // 初期のZ座標を同期
         },
-
         tick() {
           // UnityでいうUpdate。描画のたびに呼ばれる
           const { position } = this.camera.object3D;
-          //ホールを通過したら空間を反転
-          if (
-            holePosX - holeRadius / 2 <= position.x &&
-            position.x <= holePosX + holeRadius / 2 &&
-            holePosY - holeRadius / 2 <= position.y &&
-            position.y <= holePosY + holeRadius / 2 &&
-            lastPosz > holePosZ &&
-            position.z <= holePosZ
-          ) {
-            if (portalFlag) {
-              portalFlag = false;
-            } else {
-              portalFlag = true;
+          lastFlag = portalFlag;
+          // XとYがポータルの円内（四角形近似）にあるかチェック
+          const inRangeX = Math.abs(position.x - holePosX) <= holeRadius;
+          const inRangeY = Math.abs(position.y - holePosY) <= holeRadius;
+          if (inRangeX && inRangeY) {
+            // 手前から奥へ通過
+            if (lastPosz > holePosZ && position.z <= holePosZ) {
+              portalFlag = !portalFlag;
             }
-          } else if (
-            holePosX - holeRadius / 2 <= position.x &&
-            position.x <= holePosX + holeRadius / 2 &&
-            holePosY - holeRadius / 2 <= position.y &&
-            position.y <= holePosY + holeRadius / 2 &&
-            lastPosz < holePosZ &&
-            position.z >= holePosZ
-          ) {
-            if (portalFlag) {
-              portalFlag = false;
-            } else {
-              portalFlag = true;
+            // 奥から手前へ通過
+            else if (lastPosz < holePosZ && position.z >= holePosZ) {
+              portalFlag = !portalFlag;
             }
           }
-          //表示
-          if (portalFlag) {
-            //ポータルの中
-            omote.setAttribute("src", "#video");
-            ura.setAttribute("src", "#video");
-            sky.setAttribute("src", "#sushiki");
-          } else {
-            //ポータルの外
-            omote.setAttribute("src", "#sushiki");
-            ura.setAttribute("src", "#sushiki");
-            sky.setAttribute("src", "#video");
+           // 状態が変化した瞬間のみ実行（空間の反転処理）
+           if (portalFlag != lastFlag) {
+            const innerWorld = document.getElementById("inner-world");
+            const hole = document.getElementById("hole");
+
+            if (portalFlag) { //console.log("ポータルIN(異世界へ)");
+              innerWorld.setAttribute("visible", "true"); // 異世界の背景を表示
+              hole.setAttribute("src", "#camera-view");    // 穴の景色を「カメラ映像（現実）」に切り替え
+            } else { //console.log("ポータルOUT(現実へ)");
+              innerWorld.setAttribute("visible", "false"); // 異世界の背景を非表示
+              hole.setAttribute("src", "#sushiki");        // 穴の景色を「数式動画」に戻す
+            }
           }
           lastPosz = position.z;
         },
       });
     </script>
+    <style>
+      #camera-view,
+      #aframe-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* 奥 camera映像*/
+      #camera-view {
+        object-fit: cover;
+        z-index: 1;
+      }
+      /*A-Frameのオブジェクト */
+      #aframe-container {
+        z-index: 2;
+      }
+    </style>
   </head>
   <body style="margin: 0; overflow: hidden">
-    <a-scene id="scene" embedded xr-mode-ui="enabled: false;">
-      <video
-        id="video"
-        autoplay
-      >
-        <script>
-          var video = document.getElementById("video");
-          var media = navigator.mediaDevices.getUserMedia({
-            video: true,
-            video: { facingMode: "environment" }, //背面カメラ
-            audio: false, //音声なし
-          });
-          //リアルタイム再生
-          media.then((stream) => {
-            video.srcObject = stream;
-          });
-        </script>
-      </video>
-
-      <a-assets>
-        <video
-          id="sushiki"
-          autoplay
-          loop="true"
-          src="shiki.mp4"
-        ></video>
-      </a-assets>
-
-      <a-sky id="sky" src="#video"></a-sky>
-      <a-circle id="omote" rotation="0 0 0"></a-circle>
-      <a-circle id="ura" rotation="0 180 0"></a-circle>
-      <a-ring
-        open
-        id="door"
-        position="0 0 0"
-        radius-inner="0"
-        radius-outer="1"
-        color="pink"
-        class="clickable"
-      >
-        <a-text
-          id="mes"
-          position="-0.5 0 0"
-          color="black"
-          value="Tap here!!"
-          width="5"
-        ></a-text>
-      </a-ring>
+    <video id="camera-view" autoplay playsinline muted>
       <script>
-        const omote = document.getElementById("omote");
-        omote.setAttribute("position", {
-          x: holePosX,
-          y: holePosY,
-          z: holePosZ + holeHeight,
-        });
-        omote.setAttribute("radius", holeRadius);
-        omote.setAttribute("src", "#sushiki");
-        const ura = document.getElementById("ura");
-        ura.setAttribute("position", {
-          x: holePosX,
-          y: holePosY,
-          z: holePosZ - holeHeight,
-        });
-        ura.setAttribute("radius", holeRadius);
-        ura.setAttribute("src", "#sushiki");
-        const door = document.getElementById("door");
-        door.setAttribute("position", {
-          x: holePosX,
-          y: holePosY,
-          z: holePosZ+holeHeight+0.1,
-        });
-        door.setAttribute("radius-outer", holeRadius + 0.1);
+        const video = document.getElementById("camera-view");
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          // 背面カメラ（environment）を指定
+          navigator.mediaDevices
+            .getUserMedia({
+              video: { facingMode: "environment" },
+              audio: false,
+            })
+            .then((stream) => {
+              video.srcObject = stream;
+            })
+            .catch((error) => {
+              console.error("カメラの起動に失敗しました:", error);
+            });
+        }
       </script>
-      <a-camera portalcheck id="camera" wasd-controls="enabled: true">
-        <a-entity id="point" cursor="rayOrigin: mouse"></a-entity>
-        <a-entity
-          id="btgo"
-          move
-          class="clickable"
-          geometry="primitive: circle; radius: 0.006"
-          material="color: white"
-          position="0 -0.03 -0.05"
+    </video>
+    <div id="aframe-container">
+      <a-scene embedded xr-mode-ui="enabled: false">
+        <a-assets>
+          <video id="sushiki" autoplay loop="true" src="shiki.mp4" muted playsinline  crossorigin="anonymous"></video>
+        </a-assets>
+        <!-- ポータル内部（異世界）の背景 -->
+        <a-sky id="inner-world" src="#sushiki" visible="false"></a-sky>
+        <!-- material="side: double" を追加して、裏側（異世界側）からも穴が見えるように設定 -->
+        <a-circle
+          id="hole"
+          position="0 2.5 -4.1"
+          radius="1"
+          src="#sushiki"
+          material="shader: flat; side: double;" 
           visible="false"
+        ></a-circle>
+        <a-ring
+          open
+          id="door"
+          position="0 2.5 -4"
+          radius-inner="0"
+          radius-outer="1"
+          color="pink"
+          class="clickable"
         >
           <a-text
-            position="-0.0025 0.0005 0"
+            id="mes"
+            position="-0.5 0 0"
             color="black"
-            value="GO"
-            width="0.07"
+            value="Tap here!!"
+            width="5"
           ></a-text>
-        </a-entity>
-      </a-camera>
-    </a-scene>
+        </a-ring>
+        <a-camera portalcheck wasd-controls="enabled: true">
+          <a-entity cursor="rayOrigin: mouse"></a-entity>
+          <a-entity
+            id="btgo"
+            move
+            class="clickable"
+            geometry="primitive: circle; radius: 0.006"
+            material="color: white"
+            position="0 -0.03 -0.05"
+            visible="false"
+          >
+            <a-text
+              position="-0.0025 0.0005 0"
+              color="black"
+              value="GO"
+              width="0.07"
+            ></a-text>
+          </a-entity>
+        </a-camera>
+      </a-scene>
+    </div>
   </body>
 </html>
